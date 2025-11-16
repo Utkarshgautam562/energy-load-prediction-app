@@ -1,5 +1,6 @@
 # app.py
 # Streamlit — Cooling Load Predictor (India-friendly) with Predict Button
+# Added: dynamic, input-aware baseline (heuristic) — better comparison than fixed value
 
 import streamlit as st
 import numpy as np
@@ -48,9 +49,9 @@ def load_model(path="energy_model_cooling.joblib"):
     if isinstance(data, dict):
         return data.get("model"), data.get("scaler"), {
             "r2": data.get("r2"),
-
             "mae": data.get("mae"),
-            "feature_names": data.get("feature_names")
+            "feature_names": data.get("feature_names"),
+            "medians": data.get("medians")  # if present from training
         }
     return data, None, {}
 
@@ -174,8 +175,42 @@ with right:
 
         prediction = model.predict(features_scaled)[0]
 
-        # baseline comparison
-        baseline = 30.0
+        # ---------------------------
+        # Improved dynamic baseline
+        # ---------------------------
+        # Try to use medians saved in joblib (preferred). If not available, use a heuristic.
+        medians = meta.get("medians", None)
+        if medians:
+            # Build reference vector using medians but scale to user's area/height
+            ref = [
+                medians.get("X1", 0.62),                      # compactness median
+                float(total_surface_area_sqm),                # use user's surface so baseline scales
+                medians.get("X3", total_wall_area_sqm),       # wall area median fallback to user's
+                medians.get("X4", roof_area_sqm),             # roof area median
+                float(building_height_m),                     # keep user's building height (floors matter)
+                fd_num,                                       # keep user's facing direction
+                medians.get("X7", window_glass_area_sqm),     # glass area median
+                gd_num                                        # keep user's glass distribution
+            ]
+            ref = np.array([ref])
+            try:
+                ref_scaled = scaler.transform(ref) if scaler is not None else ref
+                baseline = float(model.predict(ref_scaled)[0])
+            except Exception:
+                baseline = 30.0
+        else:
+            # Heuristic fallback baseline (simple, meaningful)
+            floors = max(1, int(round(building_height_m / 3.0)))
+            base_per_100sqm = 5.0
+            glass_penalty = window_glass_area_sqm * 0.2
+            compactness_factor = (1.0 - building_compactness) * 5.0
+
+            baseline = (total_surface_area_sqm / 100.0) * base_per_100sqm
+            baseline += glass_penalty
+            baseline += floors * 1.5
+            baseline -= compactness_factor
+            baseline = float(max(5.0, min(baseline, 120.0)))
+
         diff = prediction - baseline
 
         c1, c2 = st.columns([2, 1])
@@ -185,6 +220,7 @@ with right:
                 unsafe_allow_html=True
             )
             st.write("**Predicted Cooling Load (Y2)** — estimated energy use.")
+            st.caption(f"Baseline (comparable building) ≈ {baseline:.2f} units")
         with c2:
             st.metric("Vs baseline", f"{diff:+.2f} units")
 
