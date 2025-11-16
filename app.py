@@ -47,7 +47,7 @@ def load_model(path="energy_model_cooling.joblib"):
     data = joblib.load(path)
     if isinstance(data, dict):
         return data.get("model"), data.get("scaler"), {
-            "r2": data.get("r2"),git pull --rebase origin main
+            "r2": data.get("r2"),
 
             "mae": data.get("mae"),
             "feature_names": data.get("feature_names")
@@ -218,4 +218,5 @@ with right:
 # Footer
 # ----------------------
 st.write("---")
-st.caption("Made for learning & portfolio showcase — not suitable for real engineering decisions.")
+st.caption("Made for learning & portfolio showcase — may not be suitable for real engineering decisions.")
+st.caption("Created by Utkarsh Gautam")
