@@ -47,7 +47,8 @@ def load_model(path="energy_model_cooling.joblib"):
     data = joblib.load(path)
     if isinstance(data, dict):
         return data.get("model"), data.get("scaler"), {
-            "r2": data.get("r2"),
+            "r2": data.get("r2"),git pull --rebase origin main
+
             "mae": data.get("mae"),
             "feature_names": data.get("feature_names")
         }
